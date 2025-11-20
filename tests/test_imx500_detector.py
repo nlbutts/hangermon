@@ -27,7 +27,7 @@ def test_imx500_detector_uses_metadata():
         }
     }
 
-    result = detector.detect(frame, metadata)
+    result = detector.detect(frame, metadata, None)
 
     assert result.human_present is True
     assert len(result.detections) == 1
@@ -64,7 +64,7 @@ def test_imx500_detector_falls_back_to_nested_results():
         }
     }
 
-    result = detector.detect(frame, metadata)
+    result = detector.detect(frame, metadata, None)
 
     assert result.human_present is True
     assert len(result.detections) == 1

@@ -62,6 +62,15 @@ class DetectionSettings:
     target_labels: Tuple[str, ...] = _env_csv("IMX500_TARGET_LABELS", "person")
     overlay: bool = _env_bool("IMX500_DRAW_OVERLAY", True)
     latency_field: Optional[str] = _env("IMX500_LATENCY_FIELD", "") or None
+    model_path: str = _env(
+        "IMX500_MODEL_PATH",
+        "/usr/share/imx500-models/imx500_network_ssd_mobilenetv2_fpnlite_320x320_pp.rpk",
+    )
+    iou: float = _env_float("IMX500_IOU", 0.65)
+    max_detections: int = _env_int("IMX500_MAX_DETECTIONS", 10)
+    postprocess: str = _env("IMX500_POSTPROCESS", "")
+    labels_path: Optional[str] = _env("IMX500_LABELS_PATH", "") or None
+    ignore_dash_labels: bool = _env_bool("IMX500_IGNORE_DASH_LABELS", True)
 
 
 @dataclass(slots=True)

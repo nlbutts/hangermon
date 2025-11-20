@@ -68,7 +68,7 @@ class MonitorService:
         for frame in self._camera.frames():
             if self._stop.is_set():
                 break
-            detection = self._detector.detect(frame.image, frame.metadata)
+            detection = self._detector.detect(frame.image, frame.metadata, frame.picamera)
             if detection.annotated_frame is None:
                 continue
             self._handle_detection(frame.timestamp, detection)

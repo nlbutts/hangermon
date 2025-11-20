@@ -26,6 +26,7 @@ class Frame:
     image: np.ndarray
     timestamp: float
     metadata: Optional[dict] = None
+    picamera: Optional[object] = None
 
 
 class CameraStreamer:
@@ -39,6 +40,7 @@ class CameraStreamer:
         self._stop = threading.Event()
         self._capture = None
         self._latest: Optional[Frame] = None
+        self._picamera2: Optional[object] = None
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -58,6 +60,7 @@ class CameraStreamer:
             except Exception:  # pragma: no cover - defensive
                 LOGGER.warning("Failed to release camera", exc_info=True)
         self._capture = None
+        self._picamera2 = None
 
     def latest(self) -> Optional[Frame]:
         return self._latest
@@ -90,11 +93,12 @@ class CameraStreamer:
                 LOGGER.warning("Camera frame grab failed; retrying")
                 time.sleep(0.05)
                 continue
-            self._publish(frame, None)
+            self._publish(frame, None, None)
 
     def _picamera_loop(self) -> None:  # pragma: no cover - requires hardware
         assert Picamera2 is not None
         camera = Picamera2()
+        self._picamera2 = camera
         config = camera.create_video_configuration(main={"size": (self._cfg.width, self._cfg.height)})
         camera.configure(config)
         camera.start()
@@ -107,9 +111,10 @@ class CameraStreamer:
                 finally:
                     request.release()
                 frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-                self._publish(frame_bgr, metadata)
+                self._publish(frame_bgr, metadata, camera)
         finally:
             camera.stop()
+            self._picamera2 = None
 
     def _synthetic_loop(self) -> None:
         interval = 1.0 / max(self._cfg.fps, 1)
@@ -122,12 +127,12 @@ class CameraStreamer:
                     "results": []
                 }
             }
-            self._publish(frame, synthetic_meta)
+            self._publish(frame, synthetic_meta, None)
             time.sleep(interval)
             t += 1
 
-    def _publish(self, frame: np.ndarray, metadata: Optional[dict]) -> None:
-        stamped = Frame(image=frame, timestamp=time.time(), metadata=metadata)
+    def _publish(self, frame: np.ndarray, metadata: Optional[dict], picamera: Optional[object]) -> None:
+        stamped = Frame(image=frame, timestamp=time.time(), metadata=metadata, picamera=picamera)
         self._latest = stamped
         try:
             self._queue.put_nowait(stamped)
