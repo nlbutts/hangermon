@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hanger Monitor</title>
+    <link rel="stylesheet" href="/static/css/app.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Hanger Monitor</h1>
+      <p>Real-time human detection with automatic recording</p>
+    </header>
+
+    <main>
+      <section class="live">
+        <div class="stream">
+          <img id="live-stream" src="/stream.mjpg" alt="Live stream" />
+        </div>
+        <div class="status" id="status-panel">
+          <h2>Status</h2>
+          <ul>
+            <li>Presence: <span id="presence">unknown</span></li>
+            <li>Confidence: <span id="confidence">0.0</span></li>
+            <li>FPS: <span id="fps">0.0</span></li>
+            <li>Updated: <span id="updated">--</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="clips">
+        <h2>Recorded Clips</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Duration (s)</th>
+              <th>Confidence</th>
+              <th>Download</th>
+            </tr>
+          </thead>
+          <tbody id="clip-body"></tbody>
+        </table>
+      </section>
+    </main>
+
+    <script src="/static/js/app.js"></script>
+  </body>
+</html>

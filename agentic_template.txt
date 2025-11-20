@@ -1,0 +1,46 @@
+PROJECT: Hanger Monitor - Raspberry Pi Camera Detection System
+
+GOAL:
+Create a real-time web application on Raspberry Pi that monitors human presence using AI camera detection, records video clips when humans are detected, and provides a web interface for viewing recordings.
+
+TECHNICAL REQUIREMENTS:
+
+1. HARDWARE & CAMERA INTEGRATION:
+   - Integrate Raspberry Pi AI Camera
+   - Configure camera stream capture at appropriate resolution/fps
+   - Ensure efficient resource management on RPi hardware
+   - Use Python and flask
+
+2. OBJECT DETECTION ENGINE:
+   - Leverage the Raspberry Pi AI Camera (IMX500) onboard neural engine
+   - Detect human presence directly from the sensor's metadata stream
+   - Optimize metadata parsing and filtering for Raspberry Pi performance constraints
+   - Configure detection confidence thresholds
+
+3. VIDEO RECORDING SYSTEM:
+   - Start recording when human is detected
+   - Maintain continuous recording while human remains in frame
+   - Stop recording when human leaves frame
+   - Store video clips with timestamps to filesystem
+   - Organize videos in structured directory hierarchy
+
+4. WEB USER INTERFACE:
+   - Create responsive web dashboard
+   - Display live camera feed with real-time detection overlays
+   - Show detection confidence and bounding boxes
+   - Display list of recorded video clips with metadata (timestamp, duration, confidence)
+   - Implement playback functionality for stored clips
+   - Allow users to click and watch selected video clips
+
+5. BACKEND SERVICE:
+   - Develop server application to handle camera streaming
+   - Manage video recording logic and filesystem operations
+   - Provide API endpoints for video list and playback
+   - Handle concurrent requests from web client
+
+DELIVERABLES:
+- Fully functional web application accessible on local network
+- Real-time camera feed with IMX500 detection visualization
+- Automatic video recording during human detection
+- Video library with playback capabilities
+- Documentation for setup and usage on Raspberry Pi
