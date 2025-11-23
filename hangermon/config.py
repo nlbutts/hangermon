@@ -86,7 +86,7 @@ class RecordingSettings:
 @dataclass(slots=True)
 class WebSettings:
     host: str = _env("SERVER_HOST", "0.0.0.0")
-    port: int = _env_int("SERVER_PORT", 8080)
+    port: int = _env_int("SERVER_PORT", 8000)
     debug: bool = _env_bool("SERVER_DEBUG", False)
 
 

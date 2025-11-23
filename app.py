@@ -48,7 +48,7 @@ def create_app() -> Flask:
         target = (root / relative).resolve()
         if not str(target).startswith(str(root)) or not target.exists():
             abort(404)
-        return send_file(target)
+        return send_file(target, as_attachment=True, download_name=target.name)
 
     @app.route("/stream.mjpg")
     def stream() -> Response:

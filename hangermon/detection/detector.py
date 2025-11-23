@@ -64,9 +64,11 @@ class Imx500Detector:
         if not detections:
             detections = self._parse_imx500_outputs(metadata, picamera, width, height)
         annotated = frame.copy()
-        if self._cfg.overlay:
-            for det in detections:
-                self._draw_box(annotated, det)
+        boxes_to_draw = [det for det in detections if det.label in self._target_labels]
+        if self._cfg.overlay and not boxes_to_draw:
+            boxes_to_draw = detections
+        for det in boxes_to_draw:
+            self._draw_box(annotated, det)
         human_present = any(det.label in self._target_labels for det in detections)
         latency = self._latency_from_metadata(metadata)
         return DetectionResult(detections, annotated, latency, human_present)

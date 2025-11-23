@@ -70,3 +70,32 @@ def test_imx500_detector_falls_back_to_nested_results():
     assert len(result.detections) == 1
     det = result.detections[0]
     assert det.bbox_xyxy == [5.0, 5.0, 25.0, 30.0]
+
+
+def test_imx500_detector_draws_boxes_for_people_without_overlay_flag():
+    cfg = DetectionSettings(
+        metadata_path="imx500.results",
+        target_labels=("person",),
+        min_confidence=0.1,
+        bbox_format="xywh",
+        bbox_normalized=True,
+        overlay=False,
+    )
+    detector = Imx500Detector(cfg)
+    frame = np.zeros((80, 120, 3), dtype=np.uint8)
+    original_frame = frame.copy()
+    metadata = {
+        "imx500": {
+            "results": [
+                {
+                    "label": "person",
+                    "score": 0.95,
+                    "bbox": [0.25, 0.25, 0.3, 0.4],
+                }
+            ]
+        }
+    }
+
+    result = detector.detect(frame, metadata, None)
+
+    assert np.any(result.annotated_frame != original_frame)

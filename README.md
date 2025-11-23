@@ -69,7 +69,7 @@ IMX500_METADATA_PATH=imx500.results
 IMX500_TARGET_LABELS=person
 IMX500_MIN_CONFIDENCE=0.4
 VIDEO_RETENTION_DAYS=7
-SERVER_PORT=8080
+SERVER_PORT=8000
 ```
 
 Before launching the app, use `imx500-runner` (part of `pi-imx500-tools`) to load and start a person-detection task on the sensor. The metadata keys in the settings above must align with the task's output schema.
@@ -78,12 +78,12 @@ Before launching the app, use `imx500-runner` (part of `pi-imx500-tools`) to loa
 
 ```bash
 export FLASK_APP=app.py
-flask run --host=0.0.0.0 --port=8080
+flask run --host=0.0.0.0 --port=8000
 ```
 
 or use `python app.py` to rely on the built-in runner.
 
-Point your browser to `http://<raspberrypi>:8080` to open the dashboard.
+Point your browser to `http://<raspberrypi>:8000` to open the dashboard.
 
 ### 5. Run tests
 
@@ -114,7 +114,7 @@ pytest
 | `VIDEO_GRACE_PERIOD` | `2.5` | Seconds to keep recording after subject leaves |
 | `VIDEO_RETENTION_DAYS` | `14` | Automatic deletion window |
 | `SERVER_HOST` | `0.0.0.0` | Flask bind address |
-| `SERVER_PORT` | `8080` | Flask port |
+| `SERVER_PORT` | `8000` | Flask port |
 
 ## Directory Layout
 
@@ -135,7 +135,7 @@ hangermon/
 
 ## Deployment Notes
 
-- Use `systemd` to manage the Flask process (`ExecStart=/home/pi/hangermon/.venv/bin/gunicorn -w 1 -b 0.0.0.0:8080 app:app`).
+- Use `systemd` to manage the Flask process (`ExecStart=/home/pi/hangermon/.venv/bin/gunicorn -w 1 -b 0.0.0.0:8000 app:app`).
 - Pre-load your preferred IMX500 task (e.g., person detection) using `imx500-runner --task person-detect.json` before launching the service.
 - Serve the app behind nginx if you need TLS for remote access.
 

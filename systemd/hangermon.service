@@ -1,0 +1,19 @@
+[Unit]
+Description=HangerMon human detection service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__HANGERMON_USER__
+Group=__HANGERMON_USER__
+WorkingDirectory=__INSTALL_DIR__
+EnvironmentFile=-/etc/default/hangermon
+Environment=PYTHONUNBUFFERED=1
+ExecStart=__INSTALL_DIR__/start.sh
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

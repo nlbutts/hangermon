@@ -95,3 +95,23 @@ main {
 a {
   color: #7f9cff;
 }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.btn-download {
+  background: #7f9cff;
+  color: #0f1115;
+}
+
+.btn-download:hover {
+  background: #a7bcff;
+}

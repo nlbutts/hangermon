@@ -35,9 +35,10 @@ async function refreshClips() {
       conf.textContent = clip.confidence.toFixed(2);
       const linkCell = document.createElement("td");
       const link = document.createElement("a");
-      link.textContent = "Play";
+      link.textContent = "Download";
+      link.className = "btn btn-download";
       link.href = `/api/clips/${clip.relative_path ?? clip.filename}`;
-      link.target = "_blank";
+      link.setAttribute("download", clip.filename);
       linkCell.appendChild(link);
       row.appendChild(ts);
       row.appendChild(duration);
