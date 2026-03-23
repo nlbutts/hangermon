@@ -75,10 +75,39 @@ fi
 
 mkdir -p "$INSTALL_DIR"
 
+# 2. Install APT dependencies
+echo "Installing APT dependencies..."
+apt-get update
+# Install core system packages for Python 3.13 (Trixie)
+apt-get install -y \
+  python3 \
+  python3-dev \
+  python3-pip \
+  python3-flask \
+  python3-opencv \
+  python3-numpy \
+  python3-yaml \
+  python3-dotenv \
+  python3-picamera2 \
+  ffmpeg \
+  rsync \
+  curl \
+  libatlas-base-dev \
+  libopenjp2-7 \
+  libtiff6 \
+  libgstreamer1.0-dev
+
+# 3. Install TensorFlow for YOLOv8 (Python 3.13 support)
+# We use --break-system-packages because Pi OS manages its own python environment.
+echo "Installing TensorFlow (this may take a while)..."
+pip3 install --break-system-packages "tensorflow>=2.21.0" || \
+  echo "Warning: TensorFlow installation failed. YOLOv8 detection will be unavailable."
+
 if [[ "$(realpath "$INSTALL_DIR")" != "$(realpath "$REPO_DIR")" ]]; then
   echo "Syncing repository to $INSTALL_DIR"
   rsync -a --delete \
     --exclude '.git' \
+    --exclude '.venv' \
     --exclude '__pycache__' \
     --exclude '.pytest_cache' \
     --exclude 'videos' \
@@ -103,8 +132,6 @@ chmod 644 "$SERVICE_TARGET"
 if [[ ! -f "$ENV_FILE" ]]; then
   cat <<'ENV' > "$ENV_FILE"
 # Example environment overrides for hangermon.service
-# Uncomment and adjust as needed.
-# IMX500_MODEL_PATH=/usr/share/imx500-models/imx500_network_ssd_mobilenetv2_fpnlite_320x320_pp.rpk
 # VIDEO_DIR=/opt/hangermon/videos
 ENV
 fi
@@ -114,4 +141,4 @@ systemctl enable --now hangermon.service
 
 systemctl --no-pager status hangermon.service
 
-echo "hangermon.service installed. Update $ENV_FILE for additional overrides and restart with:\n  sudo systemctl restart hangermon.service"
+echo "hangermon.service installed. Update $ENV_FILE for overrides and restart with: sudo systemctl restart hangermon.service"

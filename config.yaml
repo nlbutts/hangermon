@@ -1,0 +1,34 @@
+# Hanger Monitor Configuration
+# sensor: only picamera3 is supported now
+sensor: picamera3
+
+camera:
+  width: 1280
+  height: 720
+  fps: 15
+  queue_size: 10
+
+# ── YOLOv8 (Pi Camera v3) settings ───────────────────────────────────────────
+yolov8:
+  model_path: models/yolov8n_int8.tflite
+  input_size: 640
+  min_confidence: 0.45
+  iou: 0.45
+  target_labels:
+    - person
+  overlay: true
+
+# ── Recording ─────────────────────────────────────────────────────────────────
+recording:
+  video_dir: videos
+  codec: mp4v
+  extension: .mp4
+  pre_buffer_seconds: 1.0
+  grace_period_seconds: 2.5
+  retention_days: 14
+
+# ── Web server ────────────────────────────────────────────────────────────────
+web:
+  host: "0.0.0.0"
+  port: 8000
+  debug: false

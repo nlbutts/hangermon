@@ -12,7 +12,7 @@ import numpy as np
 
 from .camera.streamer import CameraStreamer
 from .config import Settings, settings
-from .detection.detector import DetectionResult, Imx500Detector
+from .detection import DetectionResult, make_detector
 from .recording.writer import ClipRecorder
 from .storage import catalog
 
@@ -22,7 +22,7 @@ LOGGER = logging.getLogger(__name__)
 class MonitorService:
     def __init__(self, cfg: Settings | None = None) -> None:
         self._cfg = cfg or settings
-        self._detector = Imx500Detector(self._cfg.detection)
+        self._detector = make_detector(self._cfg)
         self._camera = CameraStreamer(self._cfg.camera)
         self._recorder = ClipRecorder(self._cfg.recording, fps=self._cfg.camera.fps)
         self._thread: Optional[threading.Thread] = None
@@ -37,7 +37,8 @@ class MonitorService:
         }
         self._fps_window: Deque[float] = deque(maxlen=30)
         self._latest_jpeg: Optional[bytes] = None
-        self._target_labels = set(self._cfg.detection.target_labels) or {"person"}
+        # target_labels are now in yolov8 settings
+        self._target_labels = set(self._cfg.yolov8.target_labels) or {"person"}
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -68,7 +69,8 @@ class MonitorService:
         for frame in self._camera.frames():
             if self._stop.is_set():
                 break
-            detection = self._detector.detect(frame.image, frame.metadata, frame.picamera)
+            # YOLOv8 detector ignores metadata/picamera refs now
+            detection = self._detector.detect(frame.image)
             if detection.annotated_frame is None:
                 continue
             self._handle_detection(frame.timestamp, detection)

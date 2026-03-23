@@ -1,29 +1,17 @@
 """Central configuration for Hanger Monitor."""
 from __future__ import annotations
 
+import logging
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional, Tuple
-import os
 
+LOGGER = logging.getLogger(__name__)
 
-def _env(key: str, default: str) -> str:
-    return os.getenv(key, default)
-
-
-def _env_int(key: str, default: int) -> int:
-    try:
-        return int(os.getenv(key, default))
-    except (TypeError, ValueError):
-        return default
-
-
-def _env_float(key: str, default: float) -> float:
-    try:
-        return float(os.getenv(key, default))
-    except (TypeError, ValueError):
-        return default
-
+# ---------------------------------------------------------------------------
+# Env-var helpers
+# ---------------------------------------------------------------------------
 
 def _env_bool(key: str, default: bool) -> bool:
     raw = os.getenv(key)
@@ -32,68 +20,53 @@ def _env_bool(key: str, default: bool) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _env_csv(key: str, default: str) -> Tuple[str, ...]:
-    raw = os.getenv(key, default)
-    items = [chunk.strip() for chunk in raw.split(",") if chunk.strip()]
-    if not items:
-        items = [chunk.strip() for chunk in default.split(",") if chunk.strip()]
-    return tuple(items)
+# ---------------------------------------------------------------------------
+# Dataclasses
+# ---------------------------------------------------------------------------
 
-
-@dataclass(slots=True)
+@dataclass
 class CameraSettings:
-    device: int = _env_int("CAMERA_DEVICE", 0)
-    width: int = _env_int("CAMERA_WIDTH", 1280)
-    height: int = _env_int("CAMERA_HEIGHT", 720)
-    fps: int = _env_int("CAMERA_FPS", 15)
-    use_picamera2: bool = _env_bool("USE_PICAMERA2", True)
-    queue_size: int = _env_int("FRAME_QUEUE_SIZE", 10)
+    sensor: str = "picamera3"
+    device: int = 0
+    width: int = 1280
+    height: int = 720
+    fps: int = 15
+    queue_size: int = 10
 
 
-@dataclass(slots=True)
-class DetectionSettings:
-    metadata_path: str = _env("IMX500_METADATA_PATH", "imx500.results")
-    label_field: str = _env("IMX500_LABEL_FIELD", "label")
-    score_field: str = _env("IMX500_SCORE_FIELD", "score")
-    bbox_field: str = _env("IMX500_BBOX_FIELD", "bbox")
-    bbox_format: str = _env("IMX500_BBOX_FORMAT", "xywh")
-    bbox_normalized: bool = _env_bool("IMX500_BBOX_NORMALIZED", True)
-    min_confidence: float = _env_float("IMX500_MIN_CONFIDENCE", 0.45)
-    target_labels: Tuple[str, ...] = _env_csv("IMX500_TARGET_LABELS", "person")
-    overlay: bool = _env_bool("IMX500_DRAW_OVERLAY", True)
-    latency_field: Optional[str] = _env("IMX500_LATENCY_FIELD", "") or None
-    model_path: str = _env(
-        "IMX500_MODEL_PATH",
-        "/usr/share/imx500-models/imx500_network_ssd_mobilenetv2_fpnlite_320x320_pp.rpk",
-    )
-    iou: float = _env_float("IMX500_IOU", 0.65)
-    max_detections: int = _env_int("IMX500_MAX_DETECTIONS", 10)
-    postprocess: str = _env("IMX500_POSTPROCESS", "")
-    labels_path: Optional[str] = _env("IMX500_LABELS_PATH", "") or None
-    ignore_dash_labels: bool = _env_bool("IMX500_IGNORE_DASH_LABELS", True)
+@dataclass
+class Yolov8Settings:
+    """Pi Camera v3 / YOLOv8 TFLite settings."""
+    model_path: str = "models/yolov8n_int8.tflite"
+    input_size: int = 640
+    min_confidence: float = 0.45
+    iou: float = 0.45
+    target_labels: Tuple[str, ...] = ("person",)
+    overlay: bool = True
 
 
-@dataclass(slots=True)
+@dataclass
 class RecordingSettings:
-    base_dir: Path = Path(_env("VIDEO_DIR", "videos"))
-    codec: str = _env("VIDEO_CODEC", "mp4v")
-    extension: str = _env("VIDEO_EXTENSION", ".mp4")
-    pre_buffer_seconds: float = _env_float("VIDEO_PREBUFFER", 1.0)
-    grace_period_seconds: float = _env_float("VIDEO_GRACE_PERIOD", 2.5)
-    retention_days: int = _env_int("VIDEO_RETENTION_DAYS", 14)
+    base_dir: Path = Path("videos")
+    codec: str = "mp4v"
+    extension: str = ".mp4"
+    pre_buffer_seconds: float = 1.0
+    grace_period_seconds: float = 2.5
+    retention_days: int = 14
 
 
-@dataclass(slots=True)
+@dataclass
 class WebSettings:
-    host: str = _env("SERVER_HOST", "0.0.0.0")
-    port: int = _env_int("SERVER_PORT", 8000)
-    debug: bool = _env_bool("SERVER_DEBUG", False)
+    host: str = "0.0.0.0"
+    port: int = 8000
+    debug: bool = False
 
 
-@dataclass(slots=True)
+@dataclass
 class Settings:
+    sensor: str = "picamera3"
     camera: CameraSettings = field(default_factory=CameraSettings)
-    detection: DetectionSettings = field(default_factory=DetectionSettings)
+    yolov8: Yolov8Settings = field(default_factory=Yolov8Settings)
     recording: RecordingSettings = field(default_factory=RecordingSettings)
     web: WebSettings = field(default_factory=WebSettings)
 
@@ -103,4 +76,83 @@ class Settings:
         return self.recording.base_dir
 
 
-settings = Settings()
+# ---------------------------------------------------------------------------
+# YAML loader
+# ---------------------------------------------------------------------------
+
+def _load_yaml(path: Path) -> dict:
+    try:
+        import yaml  # type: ignore
+    except ImportError:
+        return {}
+    if not path.exists():
+        return {}
+    with open(path, "r", encoding="utf-8") as fh:
+        data = yaml.safe_load(fh) or {}
+    return data
+
+
+def _tuple_of_strings(value: object) -> Tuple[str, ...]:
+    if isinstance(value, (list, tuple)):
+        return tuple(str(v) for v in value)
+    if isinstance(value, str):
+        return tuple(s.strip() for s in value.split(",") if s.strip())
+    return ()
+
+
+def load_settings(yaml_path: str | Path = "config.yaml") -> Settings:
+    data = _load_yaml(Path(yaml_path))
+
+    sensor = os.getenv("SENSOR", data.get("sensor", "picamera3"))
+
+    cam_d = data.get("camera", {})
+    camera = CameraSettings(
+        sensor=sensor,
+        device=int(os.getenv("CAMERA_DEVICE", cam_d.get("device", 0))),
+        width=int(os.getenv("CAMERA_WIDTH", cam_d.get("width", 1280))),
+        height=int(os.getenv("CAMERA_HEIGHT", cam_d.get("height", 720))),
+        fps=int(os.getenv("CAMERA_FPS", cam_d.get("fps", 15))),
+        queue_size=int(os.getenv("FRAME_QUEUE_SIZE", cam_d.get("queue_size", 10))),
+    )
+
+    yolo_d = data.get("yolov8", {})
+    yolo_labels_raw = os.getenv("YOLO_TARGET_LABELS")
+    yolo_labels: Tuple[str, ...] = (
+        _tuple_of_strings(yolo_labels_raw) if yolo_labels_raw else _tuple_of_strings(yolo_d.get("target_labels", ["person"]))
+    )
+    yolov8 = Yolov8Settings(
+        model_path=os.getenv("YOLO_MODEL_PATH", yolo_d.get("model_path", "models/yolov8n_int8.tflite")),
+        input_size=int(os.getenv("YOLO_INPUT_SIZE", yolo_d.get("input_size", 640))),
+        min_confidence=float(os.getenv("YOLO_MIN_CONFIDENCE", yolo_d.get("min_confidence", 0.45))),
+        iou=float(os.getenv("YOLO_IOU", yolo_d.get("iou", 0.45))),
+        target_labels=yolo_labels,
+        overlay=_env_bool("YOLO_DRAW_OVERLAY", yolo_d.get("overlay", True)),
+    )
+
+    rec_d = data.get("recording", {})
+    recording = RecordingSettings(
+        base_dir=Path(os.getenv("VIDEO_DIR", rec_d.get("video_dir", "videos"))),
+        codec=os.getenv("VIDEO_CODEC", rec_d.get("codec", "mp4v")),
+        extension=os.getenv("VIDEO_EXTENSION", rec_d.get("extension", ".mp4")),
+        pre_buffer_seconds=float(os.getenv("VIDEO_PREBUFFER", rec_d.get("pre_buffer_seconds", 1.0))),
+        grace_period_seconds=float(os.getenv("VIDEO_GRACE_PERIOD", rec_d.get("grace_period_seconds", 2.5))),
+        retention_days=int(os.getenv("VIDEO_RETENTION_DAYS", rec_d.get("retention_days", 14))),
+    )
+
+    web_d = data.get("web", {})
+    web = WebSettings(
+        host=os.getenv("SERVER_HOST", web_d.get("host", "0.0.0.0")),
+        port=int(os.getenv("SERVER_PORT", web_d.get("port", 8000))),
+        debug=_env_bool("SERVER_DEBUG", web_d.get("debug", False)),
+    )
+
+    return Settings(
+        sensor=sensor,
+        camera=camera,
+        yolov8=yolov8,
+        recording=recording,
+        web=web,
+    )
+
+
+settings: Settings = load_settings()

@@ -11,14 +11,15 @@ from typing import Generator, Optional
 import cv2
 import numpy as np
 
+LOGGER = logging.getLogger(__name__)
+
 try:  # Picamera2 is optional and only available on Raspberry Pi OS
     from picamera2 import Picamera2  # type: ignore
-except ImportError:  # pragma: no cover - not available in CI
+except ImportError as exc:  # pragma: no cover - not available in CI
+    LOGGER.warning("Picamera2 not available (import failed): %s", exc)
     Picamera2 = None  # type: ignore
 
 from ..config import CameraSettings
-
-LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -45,7 +46,8 @@ class CameraStreamer:
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
             return
-        LOGGER.info("Starting camera streamer (device=%s synthetic=%s)", self._cfg.device, self._synthetic)
+        LOGGER.info("Starting camera streamer (sensor=%s device=%s synthetic=%s)", 
+                    self._cfg.sensor, self._cfg.device, self._synthetic)
         self._stop.clear()
         self._thread = threading.Thread(target=self._loop, name="camera-stream", daemon=True)
         self._thread.start()
@@ -77,9 +79,12 @@ class CameraStreamer:
         if self._synthetic:
             self._synthetic_loop()
             return
-        if self._cfg.use_picamera2 and Picamera2:
-            self._picamera_loop()
+        
+        # Dispatch based on sensor type
+        if self._cfg.sensor == "picamera3" and Picamera2:
+            self._picamera3_loop()
             return
+
         self._opencv_loop()
 
     def _opencv_loop(self) -> None:
@@ -95,23 +100,22 @@ class CameraStreamer:
                 continue
             self._publish(frame, None, None)
 
-    def _picamera_loop(self) -> None:  # pragma: no cover - requires hardware
+    def _picamera3_loop(self) -> None:  # pragma: no cover - requires hardware
+        """Plain Picamera2 capture for Pi Camera Module v3."""
         assert Picamera2 is not None
         camera = Picamera2()
         self._picamera2 = camera
-        config = camera.create_video_configuration(main={"size": (self._cfg.width, self._cfg.height)})
+        config = camera.create_video_configuration(
+            main={"size": (self._cfg.width, self._cfg.height), "format": "RGB888"}
+        )
         camera.configure(config)
         camera.start()
+        LOGGER.info("Pi Camera stream started at %dx%d", self._cfg.width, self._cfg.height)
         try:
             while not self._stop.is_set():
-                request = camera.capture_request()
-                try:
-                    frame = request.make_array("main")
-                    metadata = request.get_metadata()
-                finally:
-                    request.release()
+                frame = camera.capture_array("main")
                 frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-                self._publish(frame_bgr, metadata, camera)
+                self._publish(frame_bgr, None, None)
         finally:
             camera.stop()
             self._picamera2 = None
@@ -122,12 +126,7 @@ class CameraStreamer:
         while not self._stop.is_set():
             frame = np.zeros((self._cfg.height, self._cfg.width, 3), dtype=np.uint8)
             cv2.putText(frame, f"synthetic {t:04d}", (50, 80), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 4)
-            synthetic_meta = {
-                "imx500": {
-                    "results": []
-                }
-            }
-            self._publish(frame, synthetic_meta, None)
+            self._publish(frame, None, None)
             time.sleep(interval)
             t += 1
 
