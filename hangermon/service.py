@@ -1,4 +1,5 @@
 """Long-running monitoring service that glues everything together."""
+
 from __future__ import annotations
 
 import logging
@@ -12,7 +13,7 @@ import numpy as np
 
 from .camera.streamer import CameraStreamer
 from .config import Settings, settings
-from .detection.detector import DetectionResult, Imx500Detector
+from .detection import DetectionResult, YoloDetector
 from .recording.writer import ClipRecorder
 from .storage import catalog
 
@@ -22,7 +23,7 @@ LOGGER = logging.getLogger(__name__)
 class MonitorService:
     def __init__(self, cfg: Settings | None = None) -> None:
         self._cfg = cfg or settings
-        self._detector = Imx500Detector(self._cfg.detection)
+        self._detector = YoloDetector(self._cfg.yolo)
         self._camera = CameraStreamer(self._cfg.camera)
         self._recorder = ClipRecorder(self._cfg.recording, fps=self._cfg.camera.fps)
         self._thread: Optional[threading.Thread] = None
@@ -37,13 +38,14 @@ class MonitorService:
         }
         self._fps_window: Deque[float] = deque(maxlen=30)
         self._latest_jpeg: Optional[bytes] = None
-        self._target_labels = set(self._cfg.detection.target_labels) or {"person"}
+        self._target_labels = set(self._cfg.yolo.target_labels) or {"person"}
 
-    def start(self) -> None:
+   def start(self) -> None:
         if self._thread and self._thread.is_alive():
             return
         LOGGER.info("Starting monitor service")
         catalog.prune_old(self._cfg.recording.base_dir, self._cfg.recording.retention_days)
+        self._detector.start_server()
         self._camera.start()
         self._stop.clear()
         self._thread = threading.Thread(target=self._run, name="monitor-loop", daemon=True)
@@ -55,6 +57,7 @@ class MonitorService:
             self._thread.join(timeout=2)
         self._camera.stop()
         self._recorder.force_stop()
+        self._detector.stop()
 
     def latest_frame_bytes(self) -> Optional[bytes]:
         return self._latest_jpeg
@@ -63,12 +66,12 @@ class MonitorService:
         with self._status_lock:
             return dict(self._status)
 
-    # Internal -------------------------------------------------------------
+  # Internal -------------------------------------------------------------
     def _run(self) -> None:
         for frame in self._camera.frames():
             if self._stop.is_set():
                 break
-            detection = self._detector.detect(frame.image, frame.metadata, frame.picamera)
+            detection = self._detector.detect(frame.image, None, None)
             if detection.annotated_frame is None:
                 continue
             self._handle_detection(frame.timestamp, detection)
@@ -84,7 +87,9 @@ class MonitorService:
                 ),
                 default=0.0,
             )
-        self._recorder.update(detection.annotated_frame, detection.human_present, human_conf)
+        self._recorder.update(
+            detection.annotated_frame, detection.human_present, human_conf
+        )
         clip_meta = self._recorder.consume_last_clip()
         self._fps_window.append(time.time())
         fps = self._compute_fps()

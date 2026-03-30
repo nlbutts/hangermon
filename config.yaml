@@ -1,0 +1,30 @@
+yolo:
+  model_path: yolo_det_rpi/yolov8n.onnx
+  confidence_threshold: 0.5
+  nms_threshold: 0.45
+  target_labels:
+    - person
+  detections_required: 3
+  inference_interval_seconds: 0.5
+  server_port: 5555
+
+camera:
+  device: 0
+  width: 1280
+  height: 720
+  fps: 15
+  use_picamera2: true
+  queue_size: 10
+
+recording:
+  video_dir: videos
+  video_codec: mp4v
+  video_extension: .mp4
+  video_prebuffer: 1.0
+  video_grace_period: 2.5
+  video_retention_days: 14
+
+web:
+  host: 0.0.0.0
+  port: 8000
+  debug: false

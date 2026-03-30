@@ -1,0 +1,3 @@
+[submodule "yolo_det_rpi"]
+	path = yolo_det_rpi
+	url = git@github.com:nlbutts/yolo_det_rpi.git

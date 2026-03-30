@@ -10,6 +10,7 @@ Group=__HANGERMON_USER__
 WorkingDirectory=__INSTALL_DIR__
 EnvironmentFile=-/etc/default/hangermon
 Environment=PYTHONUNBUFFERED=1
+ExecStartPre=/usr/bin/python3 -c "import time; time.sleep(2)"
 ExecStart=__INSTALL_DIR__/start.sh
 Restart=on-failure
 RestartSec=5

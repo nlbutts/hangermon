@@ -1,4 +1,5 @@
 """Detection helpers."""
-from .detector import Detection, DetectionResult, Imx500Detector
 
-__all__ = ["Detection", "DetectionResult", "Imx500Detector"]
+from .yolo_detector import Detection, DetectionResult, YoloDetector
+
+__all__ = ["Detection", "DetectionResult", "YoloDetector"]
