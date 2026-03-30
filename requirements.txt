@@ -1,7 +1,0 @@
-flask>=3.0.0
-opencv-python>=4.9.0.80
-numpy>=1.26.0
-python-dotenv>=1.0.0
-pytest>=8.0.0
-pyzmq>=26.0.0
-pyyaml>=6.0.0

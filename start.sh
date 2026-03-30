@@ -3,17 +3,15 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Activate optional virtual environment when present so dependencies resolve.
-if [[ -d "$ROOT_DIR/.venv" && -f "$ROOT_DIR/.venv/bin/activate" ]]; then
-	# shellcheck disable=SC1091
-	source "$ROOT_DIR/.venv/bin/activate"
-fi
-
 export PYTHONUNBUFFERED=${PYTHONUNBUFFERED:-1}
 
-# Start YOLO server in background
-python3 "$ROOT_DIR/yolo_det_rpi/yolo_server.py" \
-    -m "$ROOT_DIR/yolo_det_rpi/yolov8n.onnx" \
+# Ensure uv is in PATH
+export PATH="$HOME/.local/bin:$PATH"
+
+# Start YOLO server in background using uv
+cd "$ROOT_DIR"
+uv run yolo_det_rpi/yolo_server.py \
+    -m yolo_det_rpi/yolov8n.onnx \
     -p 5555 \
     -c 0.5 \
     -n 0.45 \
@@ -31,5 +29,5 @@ cleanup() {
 }
 trap cleanup EXIT
 
-exec python3 "$ROOT_DIR/app.py"
+exec uv run python3 app.py
 

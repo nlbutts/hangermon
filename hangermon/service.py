@@ -40,7 +40,7 @@ class MonitorService:
         self._latest_jpeg: Optional[bytes] = None
         self._target_labels = set(self._cfg.yolo.target_labels) or {"person"}
 
-   def start(self) -> None:
+    def start(self) -> None:
         if self._thread and self._thread.is_alive():
             return
         LOGGER.info("Starting monitor service")
@@ -66,7 +66,7 @@ class MonitorService:
         with self._status_lock:
             return dict(self._status)
 
-  # Internal -------------------------------------------------------------
+    # Internal -------------------------------------------------------------
     def _run(self) -> None:
         for frame in self._camera.frames():
             if self._stop.is_set():
