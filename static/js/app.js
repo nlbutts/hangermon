@@ -2,6 +2,7 @@ const presenceEl = document.getElementById("presence");
 const confidenceEl = document.getElementById("confidence");
 const fpsEl = document.getElementById("fps");
 const updatedEl = document.getElementById("updated");
+const recordingStateEl = document.getElementById("recording-state");
 const clipBody = document.getElementById("clip-body");
 
 async function refreshStatus() {
@@ -14,6 +15,10 @@ async function refreshStatus() {
     confidenceEl.textContent = payload.confidence?.toFixed?.(2) ?? payload.confidence;
     fpsEl.textContent = payload.fps;
     updatedEl.textContent = payload.last_updated ? new Date(payload.last_updated * 1000).toLocaleTimeString() : "--";
+
+    const state = payload.recording_state || "standby";
+    recordingStateEl.textContent = state.toUpperCase();
+    recordingStateEl.className = "state-badge " + state;
   } catch (err) {
     console.error("status error", err);
   }

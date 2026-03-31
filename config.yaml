@@ -12,7 +12,7 @@ camera:
   device: 0
   width: 2304
   height: 1296
-  fps: 15
+  fps: 1
   use_picamera2: true
   queue_size: 10
   circular_buffer_dir: /tmp/cir_buf

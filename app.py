@@ -10,18 +10,29 @@ from typing import Generator
 from flask import Flask, Response, abort, jsonify, render_template, send_file
 
 from hangermon.config import settings
-from hangermon.service import MonitorService
 from hangermon.storage import catalog
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s :: %(message)s")
 logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
-monitor = MonitorService(settings)
+# Lazy singleton: only created once, on first access
+_monitor = None
+
+
+def _get_monitor():
+    global _monitor
+    if _monitor is None:
+        from hangermon.service import MonitorService
+        _monitor = MonitorService(settings)
+    return _monitor
 
 
 def create_app() -> Flask:
     app = Flask(__name__)
-    monitor.start()
+
+    # Only start the monitor in the actual worker process, not the reloader parent
+    if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+        _get_monitor().start()
 
     @app.route("/")
     def index() -> str:
@@ -29,7 +40,7 @@ def create_app() -> Flask:
 
     @app.route("/api/status")
     def api_status():
-        return jsonify(monitor.status_snapshot())
+        return jsonify(_get_monitor().status_snapshot())
 
     @app.route("/api/clips")
     def api_clips():
@@ -60,6 +71,7 @@ def create_app() -> Flask:
 
 def _mjpeg_generator() -> Generator[bytes, None, None]:
     boundary = b"--frame"
+    monitor = _get_monitor()
     while True:
         frame = monitor.latest_frame_bytes()
         if frame is None:
@@ -75,4 +87,7 @@ else:
     app = create_app()
 
 if __name__ == "__main__":  # pragma: no cover
-    app.run(host=settings.web.host, port=settings.web.port, debug=settings.web.debug)
+    # Never use the reloader with hardware camera - it forks the process and
+    # the child tries to re-open the camera which is already held by the parent.
+    app.run(host=settings.web.host, port=settings.web.port,
+            debug=settings.web.debug, use_reloader=False)

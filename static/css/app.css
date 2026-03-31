@@ -92,6 +92,30 @@ main {
   background: #4b5164;
 }
 
+.state-badge {
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+}
+
+.state-badge.recording {
+  background: #c0392b;
+  color: #fff;
+  animation: pulse-recording 1.5s ease-in-out infinite;
+}
+
+.state-badge.standby {
+  background: #4b5164;
+  color: #ccc;
+}
+
+@keyframes pulse-recording {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 a {
   color: #7f9cff;
 }
