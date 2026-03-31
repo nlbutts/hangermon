@@ -61,6 +61,8 @@ fi
 SERVICE_USER="${SERVICE_USER:-${SUDO_USER:-hangermon}}"
 SERVICE_TEMPLATE="$REPO_DIR/systemd/hangermon.service"
 SERVICE_TARGET="/etc/systemd/system/hangermon.service"
+YOLO_TEMPLATE="$REPO_DIR/systemd/yolo_server.service"
+YOLO_TARGET="/etc/systemd/system/yolo_server.service"
 ENV_FILE="/etc/default/hangermon"
 
 if [[ ! -f "$SERVICE_TEMPLATE" ]]; then
@@ -100,6 +102,15 @@ sed -e "s|__INSTALL_DIR__|$INSTALL_DIR|g" \
     "$SERVICE_TEMPLATE" > "$SERVICE_TARGET"
 chmod 644 "$SERVICE_TARGET"
 
+sed -e "s|__INSTALL_DIR__|$INSTALL_DIR|g" \
+    -e "s|__HANGERMON_USER__|$SERVICE_USER|g" \
+    "$YOLO_TEMPLATE" > "$YOLO_TARGET"
+chmod 644 "$YOLO_TARGET"
+
+if [[ -f "$INSTALL_DIR/start_yolo.sh" ]]; then
+    chmod +x "$INSTALL_DIR/start_yolo.sh"
+fi
+
 if [[ ! -f "$ENV_FILE" ]]; then
   cat <<'ENV' > "$ENV_FILE"
 # Example environment overrides for hangermon.service
@@ -110,8 +121,10 @@ ENV
 fi
 
 systemctl daemon-reload
+systemctl enable --now yolo_server.service
 systemctl enable --now hangermon.service
 
+systemctl --no-pager status yolo_server.service
 systemctl --no-pager status hangermon.service
 
-echo "hangermon.service installed. Update $ENV_FILE for additional overrides and restart with:\n  sudo systemctl restart hangermon.service"
+echo "Services installed. Update $ENV_FILE for additional overrides and restart with:\n  sudo systemctl restart yolo_server.service hangermon.service"

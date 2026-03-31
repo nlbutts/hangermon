@@ -14,6 +14,7 @@ from hangermon.service import MonitorService
 from hangermon.storage import catalog
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s :: %(message)s")
+logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
 monitor = MonitorService(settings)
 

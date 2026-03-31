@@ -1,0 +1,21 @@
+[Unit]
+Description=YOLO Inference Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__HANGERMON_USER__
+Group=__HANGERMON_USER__
+WorkingDirectory=__INSTALL_DIR__
+EnvironmentFile=-/etc/default/hangermon
+Environment=PYTHONUNBUFFERED=1
+# Wait 2 seconds for system to fully boot
+ExecStartPre=/usr/bin/python3 -c "import time; time.sleep(2)"
+ExecStart=__INSTALL_DIR__/start_yolo.sh
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

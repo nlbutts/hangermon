@@ -60,11 +60,15 @@ def _load_yaml_config(config_path: Path) -> dict:
 @dataclass(slots=True)
 class CameraSettings:
     device: int = _env_int("CAMERA_DEVICE", 0)
-    width: int = _env_int("CAMERA_WIDTH", 1280)
-    height: int = _env_int("CAMERA_HEIGHT", 720)
+    width: int = _env_int("CAMERA_WIDTH", 4608)
+    height: int = _env_int("CAMERA_HEIGHT", 2592)
     fps: int = _env_int("CAMERA_FPS", 15)
     use_picamera2: bool = _env_bool("USE_PICAMERA2", True)
     queue_size: int = _env_int("FRAME_QUEUE_SIZE", 10)
+    circular_buffer_dir: str = _env("CAMERA_CIR_BUF_DIR", "/tmp/cir_buf")
+    circular_buffer_duration_sec: int = _env_int("CAMERA_CIR_BUF_DURATION_SEC", 60)
+    resize_width: int = _env_int("CAMERA_RESIZE_WIDTH", 768)
+    resize_height: int = _env_int("CAMERA_RESIZE_HEIGHT", 432)
 
 
 @dataclass(slots=True)
@@ -106,8 +110,8 @@ class RecordingSettings:
     base_dir: Path = Path(_env("VIDEO_DIR", "videos"))
     codec: str = _env("VIDEO_CODEC", "mp4v")
     extension: str = _env("VIDEO_EXTENSION", ".mp4")
-    pre_buffer_seconds: float = _env_float("VIDEO_PREBUFFER", 1.0)
-    grace_period_seconds: float = _env_float("VIDEO_GRACE_PERIOD", 2.5)
+    pre_buffer_seconds: float = _env_float("VIDEO_PREBUFFER", 15.0)
+    grace_period_seconds: float = _env_float("VIDEO_GRACE_PERIOD", 15.0)
     retention_days: int = _env_int("VIDEO_RETENTION_DAYS", 14)
 
 
@@ -162,11 +166,15 @@ def load_config(config_path: Optional[Path] = None) -> Settings:
     camera_config = yaml_config.get("camera", {})
     camera = CameraSettings(
         device=camera_config.get("device", 0),
-        width=camera_config.get("width", 1280),
-        height=camera_config.get("height", 720),
+        width=camera_config.get("width", 4608),
+        height=camera_config.get("height", 2592),
         fps=camera_config.get("fps", 15),
         use_picamera2=camera_config.get("use_picamera2", True),
         queue_size=camera_config.get("queue_size", 10),
+        circular_buffer_dir=camera_config.get("circular_buffer_dir", "/tmp/cir_buf"),
+        circular_buffer_duration_sec=camera_config.get("circular_buffer_duration_sec", 60),
+        resize_width=camera_config.get("resize_width", 768),
+        resize_height=camera_config.get("resize_height", 432),
     )
 
     web_config = yaml_config.get("web", {})

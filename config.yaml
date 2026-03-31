@@ -4,24 +4,28 @@ yolo:
   nms_threshold: 0.45
   target_labels:
     - person
-  detections_required: 3
-  inference_interval_seconds: 0.5
+  detections_required: 2
+  inference_interval_seconds: 5
   server_port: 5555
 
 camera:
   device: 0
-  width: 1280
-  height: 720
+  width: 2304
+  height: 1296
   fps: 15
   use_picamera2: true
   queue_size: 10
+  circular_buffer_dir: /tmp/cir_buf
+  circular_buffer_duration_sec: 60
+  resize_width: 768
+  resize_height: 432
 
 recording:
   video_dir: videos
   video_codec: mp4v
   video_extension: .mp4
-  video_prebuffer: 1.0
-  video_grace_period: 2.5
+  video_prebuffer: 15.0
+  video_grace_period: 15.0
   video_retention_days: 14
 
 web:

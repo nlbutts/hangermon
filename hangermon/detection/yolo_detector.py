@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import logging
 import struct
-import subprocess
-import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -43,10 +41,7 @@ class YoloDetector:
         self._target_labels = set(cfg.target_labels) or {"person"}
         self._zmq_context: Optional[zmq.Context] = None
         self._socket: Optional[zmq.Socket] = None
-        self._server_process: Optional[subprocess.Popen] = None
-        self._server_thread: Optional[threading.Thread] = None
         self._connection_failed = False
-        self._first_inference = True
         self._consecutive_detections = 0
         self._init_connection()
 
@@ -107,13 +102,9 @@ class YoloDetector:
                     human_present=False,
                 )
 
-        if self._cfg.inference_interval_seconds > 0 and not self._first_inference:
-            time.sleep(self._cfg.inference_interval_seconds)
-        self._first_inference = False
-
         height, width = frame.shape[:2]
-        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+        # Frame arrives as BGR from cv2; YOLO server expects RGB
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         image_bytes = frame_rgb.tobytes()
 
         try:
@@ -209,60 +200,10 @@ class YoloDetector:
             )
         return frame
 
-    def start_server(self) -> None:
-        """Start YOLO server as subprocess."""
-        model_path = Path(self._cfg.model_path)
-        if not model_path.exists():
-            LOGGER.error("YOLO model not found: %s", model_path)
-            return
 
-        cmd = [
-            "python3",
-            str(model_path.parent / "yolo_server.py"),
-            "-m",
-            str(model_path),
-            "-p",
-            str(self._cfg.server_port),
-            "-c",
-            str(self._cfg.confidence_threshold),
-            "-n",
-            str(self._cfg.nms_threshold),
-        ]
-
-        LOGGER.info("Starting YOLO server: %s", " ".join(cmd))
-        self._server_process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-
-        self._server_thread = threading.Thread(target=self._monitor_server, daemon=True)
-        self._server_thread.start()
-
-        time.sleep(2)
-        self._init_connection()
-
-    def _monitor_server(self) -> None:
-        """Monitor YOLO server process and restart on failure."""
-        while self._server_process and self._server_process.poll() is None:
-            time.sleep(5)
-
-        if self._server_process:
-            stdout, stderr = self._server_process.communicate()
-            LOGGER.warning(
-                "YOLO server exited unexpectedly. stdout: %s, stderr: %s",
-                stdout[:200] if stdout else "",
-                stderr[:200] if stderr else "",
-            )
-
-            if self._server_process.returncode != 0:
-                LOGGER.info("Restarting YOLO server...")
-                time.sleep(2)
-                self.start_server()
 
     def stop(self) -> None:
-        """Stop detector and server."""
+        """Stop detector and cleanup."""
         if self._socket:
             try:
                 self._socket.close()
@@ -274,15 +215,5 @@ class YoloDetector:
                 self._zmq_context.term()
             except Exception:
                 pass
-
-        if self._server_process:
-            try:
-                self._server_process.terminate()
-                self._server_process.wait(timeout=5)
-            except Exception:
-                try:
-                    self._server_process.kill()
-                except Exception:
-                    pass
 
         LOGGER.info("YOLO detector stopped")
