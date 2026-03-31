@@ -3,6 +3,10 @@ const confidenceEl = document.getElementById("confidence");
 const fpsEl = document.getElementById("fps");
 const updatedEl = document.getElementById("updated");
 const recordingStateEl = document.getElementById("recording-state");
+const temperatureEl = document.getElementById("temperature");
+const humidityEl = document.getElementById("humidity");
+const ledSlider = document.getElementById("led-slider");
+const ledValueEl = document.getElementById("led-value");
 const clipBody = document.getElementById("clip-body");
 
 async function refreshStatus() {
@@ -19,10 +23,40 @@ async function refreshStatus() {
     const state = payload.recording_state || "standby";
     recordingStateEl.textContent = state.toUpperCase();
     recordingStateEl.className = "state-badge " + state;
+
+    // Sense HAT sensors
+    if (payload.temperature_f !== undefined) {
+      temperatureEl.textContent = payload.temperature_f.toFixed(1) + "°F / " + payload.temperature_c.toFixed(1) + "°C";
+    }
+    if (payload.humidity !== undefined) {
+      humidityEl.textContent = payload.humidity.toFixed(1);
+    }
+    if (payload.led_intensity !== undefined && !ledSlider._userDragging) {
+      ledSlider.value = payload.led_intensity;
+      ledValueEl.textContent = payload.led_intensity;
+    }
   } catch (err) {
     console.error("status error", err);
   }
 }
+
+// LED slider interaction
+let ledDebounce = null;
+
+ledSlider.addEventListener("input", () => {
+  ledSlider._userDragging = true;
+  ledValueEl.textContent = ledSlider.value;
+  clearTimeout(ledDebounce);
+  ledDebounce = setTimeout(() => {
+    fetch("/api/led", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ intensity: parseInt(ledSlider.value) }),
+    }).finally(() => {
+      ledSlider._userDragging = false;
+    });
+  }, 100);
+});
 
 async function refreshClips() {
   try {

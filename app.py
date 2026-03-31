@@ -7,9 +7,10 @@ import time
 from pathlib import Path
 from typing import Generator
 
-from flask import Flask, Response, abort, jsonify, render_template, send_file
+from flask import Flask, Response, abort, jsonify, render_template, request, send_file
 
 from hangermon.config import settings
+from hangermon.sensehat import sensehat
 from hangermon.storage import catalog
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s :: %(message)s")
@@ -41,6 +42,13 @@ def create_app() -> Flask:
     @app.route("/api/status")
     def api_status():
         return jsonify(_get_monitor().status_snapshot())
+
+    @app.route("/api/led", methods=["POST"])
+    def api_set_led():
+        data = request.get_json(silent=True) or {}
+        intensity = int(data.get("intensity", 0))
+        sensehat.set_led_intensity(intensity)
+        return jsonify({"intensity": sensehat.get_led_intensity()})
 
     @app.route("/api/clips")
     def api_clips():

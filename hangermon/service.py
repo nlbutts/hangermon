@@ -17,6 +17,7 @@ from .config import Settings, settings
 from .detection import DetectionResult, YoloDetector
 from .recording.writer import ClipRecorder
 from .recording.stitcher import BackgroundStitcher
+from .sensehat import sensehat
 from .storage import catalog
 
 LOGGER = logging.getLogger(__name__)
@@ -37,6 +38,10 @@ class MonitorService:
             "confidence": 0.0,
             "fps": 0.0,
             "recording_state": "standby",
+            "temperature_c": 0.0,
+            "temperature_f": 32.0,
+            "humidity": 0.0,
+            "led_intensity": 0,
             "last_clip": None,
             "last_updated": None,
         }
@@ -63,6 +68,7 @@ class MonitorService:
         self._camera.stop()
         self._recorder.force_stop()
         self._stitcher.stop()
+        sensehat.shutdown()
 
     def latest_frame_bytes(self) -> Optional[bytes]:
         return self._latest_jpeg
@@ -82,6 +88,10 @@ class MonitorService:
                 
             frame_small = cv2.resize(frame.image, (self._cfg.camera.resize_width, self._cfg.camera.resize_height))
             self._latest_jpeg = self._to_jpeg(frame_small)
+
+            # Read Sense HAT sensors (cheap I2C read, ~1ms)
+            sensor_data = sensehat.read_sensors()
+            self._status_update(sensor_data | {"led_intensity": sensehat.get_led_intensity()})
 
             now = time.time()
             if now - last_inference >= interval:
