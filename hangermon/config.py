@@ -69,6 +69,8 @@ class CameraSettings:
     resize_width: int = 640
     resize_height: int = 480
     h264_bitrate: int = 5000000
+    minimum_clip: int = 30
+    pre_trigger_time: int = 15
 
 
 @dataclass(slots=True)
@@ -146,6 +148,8 @@ def load_config(config_path: Optional[Path] = None) -> Settings:
         resize_width=camera_config.get("resize_width", 640),
         resize_height=camera_config.get("resize_height", 480),
         h264_bitrate=camera_config.get("h264_bitrate", 5000000),
+        minimum_clip=camera_config.get("minimum_clip", 30),
+        pre_trigger_time=camera_config.get("pre_trigger_time", 15),
     )
 
     web_config = yaml_config.get("web", {})

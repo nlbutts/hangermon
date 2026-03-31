@@ -111,6 +111,11 @@ main {
   color: #fff;
 }
 
+.state-badge.cooldown {
+  background: #d4a017;
+  color: #111;
+}
+
 @keyframes pulse-recording {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }

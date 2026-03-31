@@ -14,7 +14,8 @@ from hangermon.sensehat import sensehat
 from hangermon.storage import catalog
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s :: %(message)s")
-logging.getLogger("werkzeug").setLevel(logging.INFO)
+logging.getLogger().setLevel(logging.INFO)
+logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
 # Lazy singleton: only created once, on first access
 _monitor = None

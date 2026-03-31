@@ -11,6 +11,7 @@ rsync -avz --delete \
     --exclude '.ruff_cache' \
     --exclude '.pytest_cache' \
     --exclude '.venv' \
+    --exclude 'videos' \
     "$ROOT_DIR/" "nlbutts@${UNIT}:hangermon/"
 
 echo "Sync to ${UNIT} complete!"

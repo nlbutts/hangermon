@@ -25,16 +25,20 @@ LOGGER = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class Frame:
-    """A 640x480 BGR still captured once per second."""
+    """A 640x480 still captured once per second."""
     image: np.ndarray
     timestamp: float
 
 
 class CameraStreamer:
     """Captures 1920x1080 H.264 to in-memory circular buffer.
-    
-    Yields 640x480 BGR stills at ~1fps for the web UI and YOLO inference.
-    On demand, dumps the 60-second H.264 buffer to a file.
+
+    The circular buffer holds `pre_trigger_time` seconds of H.264 data.
+    On save_clip(), the buffer is flushed (pre-trigger footage) and the
+    encoder continues recording live for the remaining time to reach
+    `minimum_clip` seconds total.
+
+    Yields 640x480 stills at ~1fps for the web UI and YOLO inference.
     """
 
     def __init__(self, config: CameraSettings, synthetic: bool = False) -> None:
@@ -74,10 +78,14 @@ class CameraStreamer:
                 continue
 
     def save_clip(self, output_dir: Path) -> Optional[Path]:
-        """Dump the 60-second circular buffer to an H.264 file, then remux to MP4.
-        
-        Blocks for a few seconds while the buffer flushes. Returns the MP4 path
-        on success, or None on failure.
+        """Save a clip of minimum_clip seconds total.
+
+        The clip consists of:
+          - pre_trigger_time seconds from the circular buffer (pre-trigger)
+          - (minimum_clip - pre_trigger_time) seconds of live recording
+
+        Blocks for the live recording duration. Returns the MP4 path on
+        success, or None on failure.
         """
         if self._circ_output is None:
             LOGGER.warning("No circular output available for saving")
@@ -92,13 +100,26 @@ class CameraStreamer:
             h264_path = target_dir / ts.strftime("hanger-%H%M%S.h264")
             mp4_path = h264_path.with_suffix(".mp4")
 
+            pre_trigger = self._cfg.pre_trigger_time
+            live_duration = max(self._cfg.minimum_clip - pre_trigger, 5)
+
             try:
+                # Start file output: dumps the pre-trigger buffer AND
+                # continues recording live frames to the same file.
                 self._circ_output.fileoutput = str(h264_path)
                 self._circ_output.start()
-                time.sleep(3)  # allow ring buffer to flush to disk
+                LOGGER.info(
+                    "Recording clip: %ds pre-trigger + %ds live = %ds total → %s",
+                    pre_trigger, live_duration, pre_trigger + live_duration, h264_path.name,
+                )
+
+                # Wait for the live portion (camera keeps feeding frames
+                # to both the circular buffer and the file during this time)
+                self._stop.wait(timeout=live_duration)
+
                 self._circ_output.stop()
                 self._circ_output.fileoutput = None
-                LOGGER.info("Saved H.264 clip: %s", h264_path)
+                LOGGER.info("Clip recording complete: %s", h264_path)
 
                 # Remux H.264 → MP4 (container copy, no re-encode, nearly instant)
                 result = subprocess.run(
@@ -115,6 +136,10 @@ class CameraStreamer:
 
             except Exception:
                 LOGGER.error("Failed to save clip", exc_info=True)
+                try:
+                    self._circ_output.stop()
+                except Exception:
+                    pass
                 self._circ_output.fileoutput = None
                 return None
 
@@ -135,18 +160,19 @@ class CameraStreamer:
         )
         self._picam2.configure(video_config)
 
-        # H.264 hardware encoder → circular ring buffer
+        # H.264 hardware encoder → circular ring buffer sized to pre_trigger_time
         self._encoder = H264Encoder(bitrate=self._cfg.h264_bitrate)
-        buf_frames = self._cfg.fps * self._cfg.circular_buffer_duration_sec
+        buf_frames = self._cfg.fps * self._cfg.pre_trigger_time
         self._circ_output = CircularOutput(buffersize=buf_frames)
 
         self._picam2.start_recording(self._encoder, self._circ_output)
         LOGGER.info(
             "Picamera2 H.264 recording started: main=%dx%d@%dfps, lores=%dx%d, "
-            "circular_buffer=%ds (%d frames), bitrate=%d",
+            "pre_trigger=%ds (%d frames), minimum_clip=%ds, bitrate=%d",
             self._cfg.width, self._cfg.height, self._cfg.fps,
             self._cfg.resize_width, self._cfg.resize_height,
-            self._cfg.circular_buffer_duration_sec, buf_frames,
+            self._cfg.pre_trigger_time, buf_frames,
+            self._cfg.minimum_clip,
             self._cfg.h264_bitrate,
         )
 

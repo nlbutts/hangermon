@@ -19,11 +19,13 @@ camera:
   resize_width: 640
   resize_height: 480
   h264_bitrate: 20000000
+  minimum_clip: 30
+  pre_trigger_time: 5
 
 recording:
   video_dir: videos
   video_extension: .mp4
-  retention_days: 14
+  retention_days: 365
 
 web:
   host: 0.0.0.0
