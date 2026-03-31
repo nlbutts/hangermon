@@ -29,15 +29,15 @@ main {
 }
 
 .stream {
-  flex: 2;
-  min-width: 280px;
+  flex: none;
   background: #010101;
   border-radius: 0.5rem;
   overflow: hidden;
 }
 
 .stream img {
-  width: 100%;
+  width: 640px;
+  height: 480px;
   display: block;
 }
 
@@ -100,15 +100,15 @@ main {
   letter-spacing: 0.05em;
 }
 
-.state-badge.recording {
+.state-badge.saving {
   background: #c0392b;
   color: #fff;
   animation: pulse-recording 1.5s ease-in-out infinite;
 }
 
-.state-badge.standby {
-  background: #4b5164;
-  color: #ccc;
+.state-badge.monitoring {
+  background: #1d8f5b;
+  color: #fff;
 }
 
 @keyframes pulse-recording {

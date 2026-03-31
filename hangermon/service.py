@@ -7,7 +7,6 @@ import threading
 import time
 from collections import deque
 from typing import Deque, Dict, Optional
-from pathlib import Path
 
 import cv2
 import numpy as np
@@ -15,8 +14,6 @@ import numpy as np
 from .camera.streamer import CameraStreamer
 from .config import Settings, settings
 from .detection import DetectionResult, YoloDetector
-from .recording.writer import ClipRecorder
-from .recording.stitcher import BackgroundStitcher
 from .sensehat import sensehat
 from .storage import catalog
 
@@ -28,8 +25,6 @@ class MonitorService:
         self._cfg = cfg or settings
         self._detector = YoloDetector(self._cfg.yolo)
         self._camera = CameraStreamer(self._cfg.camera)
-        self._recorder = ClipRecorder(self._cfg.recording, fps=self._cfg.camera.fps)
-        self._stitcher = BackgroundStitcher(self._cfg.recording, self._cfg.camera)
         self._thread: Optional[threading.Thread] = None
         self._stop = threading.Event()
         self._status_lock = threading.Lock()
@@ -37,7 +32,7 @@ class MonitorService:
             "human_present": False,
             "confidence": 0.0,
             "fps": 0.0,
-            "recording_state": "standby",
+            "recording_state": "monitoring",
             "temperature_c": 0.0,
             "temperature_f": 32.0,
             "humidity": 0.0,
@@ -47,7 +42,6 @@ class MonitorService:
         }
         self._fps_window: Deque[float] = deque(maxlen=30)
         self._latest_jpeg: Optional[bytes] = None
-        self._last_detections = []
         self._target_labels = set(self._cfg.yolo.target_labels) or {"person"}
 
     def start(self) -> None:
@@ -56,7 +50,6 @@ class MonitorService:
         LOGGER.info("Starting monitor service")
         catalog.prune_old(self._cfg.recording.base_dir, self._cfg.recording.retention_days)
         self._camera.start()
-        self._stitcher.start()
         self._stop.clear()
         self._thread = threading.Thread(target=self._run, name="monitor-loop", daemon=True)
         self._thread.start()
@@ -64,10 +57,8 @@ class MonitorService:
     def stop(self) -> None:
         self._stop.set()
         if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=2)
+            self._thread.join(timeout=5)
         self._camera.stop()
-        self._recorder.force_stop()
-        self._stitcher.stop()
         sensehat.shutdown()
 
     def latest_frame_bytes(self) -> Optional[bytes]:
@@ -79,66 +70,91 @@ class MonitorService:
 
     # Internal -------------------------------------------------------------
     def _run(self) -> None:
-        last_inference = 0.0
-        interval = self._cfg.yolo.inference_interval_seconds
+        """Main monitoring loop.
 
+        Each frame (~1fps) is:
+        1. JPEG-encoded for the web UI
+        2. Sent to the YOLO server for inference
+        3. On confirmed detection → save the 60s H.264 clip → reset
+        """
         for frame in self._camera.frames():
             if self._stop.is_set():
                 break
-                
-            frame_small = cv2.resize(frame.image, (self._cfg.camera.resize_width, self._cfg.camera.resize_height))
-            self._latest_jpeg = self._to_jpeg(frame_small)
 
-            # Read Sense HAT sensors (cheap I2C read, ~1ms)
+            # JPEG for web streaming
+            self._latest_jpeg = self._to_jpeg(frame.image)
+
+            # Sense HAT sensors
             sensor_data = sensehat.read_sensors()
             self._status_update(sensor_data | {"led_intensity": sensehat.get_led_intensity()})
 
-            now = time.time()
-            if now - last_inference >= interval:
-                detection = self._detector.detect(frame_small, None, None)
-                last_inference = now
-                self._last_detections = detection.detections
-                self._handle_detection(frame.timestamp, detection, frame.cir_buf_file)
-            else:
-                # Maintain recording event state continuously
-                self._fps_window.append(now)
-                
-                current_detected = bool(self._status.get("human_present", False))
-                conf = float(self._status.get("confidence", 0.0))
-                self._recorder.update(frame.cir_buf_file, current_detected, conf)
-                
-                rec_state = "recording" if self._recorder._is_detecting else "standby"
-                self._status_update({"recording_state": rec_state})
-                
-                clip_meta = self._recorder.consume_last_clip()
-                if clip_meta:
-                    self._status_update({"last_clip": clip_meta})
+            # FPS tracking
+            self._fps_window.append(time.time())
 
-    def _handle_detection(self, timestamp: float, detection: DetectionResult, cir_buf_file: Optional[Path]) -> None:
+            # YOLO inference on every frame
+            detection = self._detector.detect(frame.image, None, None)
+            self._handle_detection(frame.timestamp, detection)
+
+    def _handle_detection(self, timestamp: float, detection: DetectionResult) -> None:
         human_conf = 0.0
         if detection.detections:
             human_conf = max(
-                (
-                    det.confidence
-                    for det in detection.detections
-                    if det.label in self._target_labels
-                ),
+                (det.confidence for det in detection.detections if det.label in self._target_labels),
                 default=0.0,
             )
-        self._recorder.update(cir_buf_file, detection.human_present, human_conf)
-        clip_meta = self._recorder.consume_last_clip()
-        self._fps_window.append(time.time())
+
         fps = self._compute_fps()
-        self._status_update(
-            {
-                "human_present": detection.human_present,
+
+        if detection.human_present:
+            LOGGER.info("Human confirmed (conf=%.2f, consecutive=%d), saving 60s clip...",
+                        human_conf, self._detector._consecutive_detections)
+
+            self._status_update({
+                "human_present": True,
                 "confidence": round(human_conf, 3),
                 "fps": fps,
+                "recording_state": "saving",
                 "last_updated": timestamp,
-                "last_clip": clip_meta or self._status.get("last_clip"),
-                "recording_state": "recording" if self._recorder._is_detecting else "standby",
-            }
-        )
+            })
+
+            # Dump the circular buffer to MP4
+            clip_path = self._camera.save_clip(self._cfg.recording.base_dir)
+            if clip_path:
+                LOGGER.info("Clip saved: %s", clip_path)
+                # Write metadata JSON so the catalog scanner can find this clip
+                import json
+                from datetime import datetime
+                meta = {
+                    "timestamp": datetime.fromtimestamp(timestamp).isoformat(),
+                    "duration": self._cfg.camera.circular_buffer_duration_sec,
+                    "frames": 0,
+                    "confidence": round(human_conf, 3),
+                }
+                meta_path = clip_path.with_suffix(clip_path.suffix + ".json")
+                with open(meta_path, "w", encoding="utf-8") as f:
+                    json.dump(meta, f, indent=2)
+
+                self._status_update({
+                    "recording_state": "monitoring",
+                    "last_clip": {
+                        "path": clip_path.name,
+                        "timestamp": timestamp,
+                        "relative_path": str(clip_path.relative_to(self._cfg.recording.base_dir)),
+                    },
+                })
+            else:
+                self._status_update({"recording_state": "monitoring"})
+
+            # Reset detector so we start fresh
+            self._detector.reset()
+        else:
+            self._status_update({
+                "human_present": False,
+                "confidence": round(human_conf, 3),
+                "fps": fps,
+                "recording_state": "monitoring",
+                "last_updated": timestamp,
+            })
 
     def _status_update(self, payload: Dict[str, object]) -> None:
         with self._status_lock:
@@ -146,7 +162,7 @@ class MonitorService:
 
     def _compute_fps(self) -> float:
         now = time.time()
-        while self._fps_window and now - self._fps_window[0] > 2.0:
+        while self._fps_window and now - self._fps_window[0] > 10.0:
             self._fps_window.popleft()
         if len(self._fps_window) < 2:
             return 0.0

@@ -5,28 +5,25 @@ yolo:
   target_labels:
     - person
   detections_required: 2
-  inference_interval_seconds: 5
+  inference_interval_seconds: 1
   server_port: 5555
 
 camera:
   device: 0
-  width: 2304
-  height: 1296
-  fps: 1
+  width: 1920
+  height: 1080
+  fps: 30
   use_picamera2: true
-  queue_size: 10
-  circular_buffer_dir: /tmp/cir_buf
+  queue_size: 5
   circular_buffer_duration_sec: 60
-  resize_width: 768
-  resize_height: 432
+  resize_width: 640
+  resize_height: 480
+  h264_bitrate: 20000000
 
 recording:
   video_dir: videos
-  video_codec: mp4v
   video_extension: .mp4
-  video_prebuffer: 15.0
-  video_grace_period: 15.0
-  video_retention_days: 14
+  retention_days: 14
 
 web:
   host: 0.0.0.0

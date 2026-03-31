@@ -202,6 +202,11 @@ class YoloDetector:
 
 
 
+    def reset(self) -> None:
+        """Reset detection state. Called after saving a clip."""
+        self._consecutive_detections = 0
+        LOGGER.info("YOLO detector reset (consecutive detections cleared)")
+
     def stop(self) -> None:
         """Stop detector and cleanup."""
         if self._socket:
