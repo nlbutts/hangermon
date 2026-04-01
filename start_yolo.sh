@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd hangermon/yolo_det_rpi
-uv run yolo_server.py -m yolo_det_rpi/yolov8n.onnx -p 5555 -c 0.5 -n 0.45
+cd yolo_det_rpi
+python3 yolo_server.py -m yolov8n_integer_quant.tflite -p 5555 -c 0.5 -n 0.45
