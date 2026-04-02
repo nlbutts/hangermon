@@ -13,49 +13,67 @@
     </header>
 
     <main>
-      <section class="live">
-        <div class="stream">
+      <section id="live-section" class="card">
+        <div class="stream-container">
           <img id="live-stream" src="/stream.mjpg" alt="Live stream" />
+          <div id="recording-overlay" class="overlay hidden">REC</div>
         </div>
-        <div class="status" id="status-panel">
-          <h2>Status</h2>
-          <ul>
-            <li>State: <span id="recording-state" class="state-badge monitoring">MONITORING</span></li>
-            <li>Presence: <span id="presence">unknown</span></li>
-            <li>Confidence: <span id="confidence">0.0</span></li>
-            <li>FPS: <span id="fps">0.0</span></li>
-            <li>Updated: <span id="updated">--</span></li>
-          </ul>
-
-          <h2>Environment</h2>
-          <ul>
-            <li>Temperature: <span id="temperature">--</span></li>
-            <li>Humidity: <span id="humidity">--</span>%</li>
-          </ul>
-
-          <h2>LED Control</h2>
-          <div class="slider-group">
-            <label for="led-slider">Intensity: <span id="led-value">0</span></label>
-            <input type="range" id="led-slider" min="0" max="255" value="0" />
+        
+        <div class="status-grid" id="status-panel">
+          <div class="status-item">
+            <span class="label">Detection</span>
+            <span id="presence" class="badge-idle">CLEAR</span>
+          </div>
+          <div class="status-item">
+            <span class="label">Status</span>
+            <span id="recording-state" class="state-badge monitoring">MONITORING</span>
+          </div>
+          <div class="status-item">
+            <span class="label">Confidence</span>
+            <span id="confidence" class="value">0.00</span>
+          </div>
+          <div class="status-item">
+            <span class="label">Performance</span>
+            <span id="fps" class="value">0.0</span>
           </div>
         </div>
       </section>
 
-      <section class="clips">
-        <h2>Recorded Clips</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Timestamp</th>
-              <th>Duration (s)</th>
-              <th>Confidence</th>
-              <th>Download</th>
-            </tr>
-          </thead>
-          <tbody id="clip-body"></tbody>
-        </table>
+      <section id="env-section" class="card grid-2">
+        <div class="env-item">
+          <span class="icon">🌡️</span>
+          <div>
+            <span class="label">Temperature</span>
+            <div id="temperature" class="value">--</div>
+          </div>
+        </div>
+        <div class="env-item">
+          <span class="icon">💧</span>
+          <div>
+            <span class="label">Humidity</span>
+            <div id="humidity" class="value">--%</div>
+          </div>
+        </div>
+        
+        <div class="control-item full-width">
+          <div class="control-header">
+            <span class="label">LED INTENSITY</span>
+            <span id="led-value" class="value">0</span>
+          </div>
+          <input type="range" id="led-slider" min="0" max="255" value="0" />
+        </div>
+      </section>
+
+      <section id="clips-section">
+        <div class="section-header">
+          <h2>Recorded Clips</h2>
+        </div>
+        <div id="clip-list" class="clip-grid">
+          <!-- Clips will be injected here as cards -->
+        </div>
       </section>
     </main>
+
 
     <script src="/static/js/app.js"></script>
   </body>

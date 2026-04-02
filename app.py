@@ -56,11 +56,7 @@ def create_app() -> Flask:
         records = []
         base = settings.recording.base_dir.resolve()
         for clip in catalog.list_clips(base):
-            try:
-                relative = clip.path.resolve().relative_to(base)
-            except ValueError:
-                relative = clip.path.name
-            records.append(clip.to_dict(str(relative)))
+            records.append(clip.to_dict(base))
         return jsonify({"clips": records})
 
     @app.route("/api/clips/<path:relative>")
@@ -69,7 +65,11 @@ def create_app() -> Flask:
         target = (root / relative).resolve()
         if not str(target).startswith(str(root)) or not target.exists():
             abort(404)
-        return send_file(target, as_attachment=True, download_name=target.name)
+        
+        # Only force download for videos
+        as_attachment = target.suffix in (".mp4", ".h264")
+        return send_file(target, as_attachment=as_attachment, download_name=target.name)
+
 
     @app.route("/stream.mjpg")
     def stream() -> Response:

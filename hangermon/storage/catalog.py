@@ -18,8 +18,9 @@ class ClipRecord:
     duration: float
     frames: int
     confidence: float
+    thumbnail: str | None = None
 
-    def to_dict(self, relative_path: str | None = None) -> dict:
+    def to_dict(self, relative_prefix: str | None = None) -> dict:
         payload = {
             "path": str(self.path),
             "filename": self.path.name,
@@ -28,8 +29,11 @@ class ClipRecord:
             "frames": self.frames,
             "confidence": self.confidence,
         }
-        if relative_path:
-            payload["relative_path"] = relative_path
+        if relative_prefix:
+            payload["relative_path"] = str(self.path.relative_to(relative_prefix))
+            if self.thumbnail:
+                # Assuming thumbnail is in the same directory as the video
+                payload["thumbnail_path"] = str((self.path.parent / self.thumbnail).relative_to(relative_prefix))
         return payload
 
 
@@ -43,7 +47,9 @@ def load_metadata(meta_path: Path) -> ClipRecord:
         duration=payload.get("duration", 0.0),
         frames=payload.get("frames", 0),
         confidence=payload.get("confidence", 0.0),
+        thumbnail=payload.get("thumbnail"),
     )
+
 
 
 def list_clips(base_dir: Path, limit: int = 50) -> List[ClipRecord]:

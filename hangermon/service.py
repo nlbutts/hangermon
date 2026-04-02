@@ -108,9 +108,9 @@ class MonitorService:
 
             # YOLO inference on every frame
             detection = self._detector.detect(frame.image, None, None)
-            self._handle_detection(frame.timestamp, detection)
+            self._handle_detection(frame.timestamp, detection, frame.image)
 
-    def _handle_detection(self, timestamp: float, detection: DetectionResult) -> None:
+    def _handle_detection(self, timestamp: float, detection: DetectionResult, frame: np.ndarray) -> None:
         human_conf = 0.0
         if detection.detections:
             human_conf = max(
@@ -136,34 +136,13 @@ class MonitorService:
                 "last_updated": timestamp,
             })
 
-            # This blocks for (minimum_clip - pre_trigger_time) seconds
-            # while the camera records the live portion of the clip.
-            clip_path = self._camera.save_clip(self._cfg.recording.base_dir)
-            self._last_save_time = time.time()
-
-            if clip_path:
-                LOGGER.info("Clip saved: %s", clip_path)
-                # Write metadata JSON for the catalog scanner
-                meta = {
-                    "timestamp": datetime.fromtimestamp(timestamp).isoformat(),
-                    "duration": min_clip,
-                    "frames": 0,
-                    "confidence": round(human_conf, 3),
-                }
-                meta_path = clip_path.with_suffix(clip_path.suffix + ".json")
-                with open(meta_path, "w", encoding="utf-8") as f:
-                    json.dump(meta, f, indent=2)
-
-                self._status_update({
-                    "recording_state": "cooldown",
-                    "last_clip": {
-                        "path": clip_path.name,
-                        "timestamp": timestamp,
-                        "relative_path": str(clip_path.relative_to(self._cfg.recording.base_dir)),
-                    },
-                })
-            else:
-                self._status_update({"recording_state": "cooldown"})
+            # Launch recording in background so the monitor loop keeps running
+            threading.Thread(
+                target=self._background_record,
+                args=(timestamp, human_conf, frame),
+                name="recorder-bg",
+                daemon=True,
+            ).start()
 
             # Reset detector so consecutive count starts fresh
             self._detector.reset()
@@ -175,6 +154,47 @@ class MonitorService:
                 "recording_state": "monitoring",
                 "last_updated": timestamp,
             })
+
+    def _background_record(self, timestamp: float, confidence: float, triggering_frame: np.ndarray) -> None:
+        """Saves a clip, metadata, and thumbnail in the background."""
+        try:
+            clip_path = self._camera.save_clip(self._cfg.recording.base_dir)
+            self._last_save_time = time.time()
+
+            if clip_path:
+                LOGGER.info("Clip saved: %s", clip_path)
+                
+                # Save thumbnail
+                thumb_path = clip_path.with_suffix(".thumb.jpg")
+                cv2.imwrite(str(thumb_path), triggering_frame)
+
+                # Write metadata JSON
+                meta = {
+                    "timestamp": datetime.fromtimestamp(timestamp).isoformat(),
+                    "duration": self._cfg.camera.minimum_clip,
+                    "frames": 0,
+                    "confidence": round(confidence, 3),
+                    "thumbnail": thumb_path.name,
+                }
+                meta_path = clip_path.with_suffix(clip_path.suffix + ".json")
+                with open(meta_path, "w", encoding="utf-8") as f:
+                    json.dump(meta, f, indent=2)
+
+                self._status_update({
+                    "recording_state": "cooldown",
+                    "last_clip": {
+                        "path": clip_path.name,
+                        "timestamp": timestamp,
+                        "relative_path": str(clip_path.relative_to(self._cfg.recording.base_dir)),
+                        "thumbnail": thumb_path.name,
+                    },
+                })
+            else:
+                self._status_update({"recording_state": "cooldown"})
+        except Exception:
+            LOGGER.error("Background recording failed", exc_info=True)
+            self._status_update({"recording_state": "monitoring"})
+
 
     def _status_update(self, payload: Dict[str, object]) -> None:
         with self._status_lock:
