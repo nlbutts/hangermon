@@ -104,11 +104,13 @@ class Settings:
     yolo: YoloSettings = field(default_factory=YoloSettings)
     recording: RecordingSettings = field(default_factory=RecordingSettings)
     web: WebSettings = field(default_factory=WebSettings)
+    version: str = "1.0.0"
 
     @property
     def video_root(self) -> Path:
         self.recording.base_dir.mkdir(parents=True, exist_ok=True)
         return self.recording.base_dir
+
 
 
 def load_config(config_path: Optional[Path] = None) -> Settings:
@@ -159,7 +161,14 @@ def load_config(config_path: Optional[Path] = None) -> Settings:
         debug=web_config.get("debug", False),
     )
 
-    return Settings(camera=camera, yolo=yolo, recording=recording, web=web)
+    return Settings(
+        camera=camera, 
+        yolo=yolo, 
+        recording=recording, 
+        web=web,
+        version=yaml_config.get("version", "1.0.0")
+    )
+
 
 
 settings = load_config()

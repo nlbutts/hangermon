@@ -10,6 +10,8 @@ const ledSlider = document.getElementById("led-slider");
 const ledValueEl = document.getElementById("led-value");
 const clipListEl = document.getElementById("clip-list");
 
+const versionEl = document.getElementById("app-version");
+
 function formatTime(isoString) {
   const d = new Date(isoString);
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + 
@@ -21,6 +23,12 @@ async function refreshStatus() {
     const response = await fetch("/api/status");
     if (!response.ok) return;
     const payload = await response.json();
+
+    // App Version (only set once or if changed)
+    if (versionEl.textContent !== payload.version) {
+      versionEl.textContent = "v" + payload.version;
+    }
+
 
     // Detections
     if (payload.human_present) {

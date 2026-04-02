@@ -44,6 +44,17 @@ header h1 {
   -webkit-text-fill-color: transparent;
 }
 
+.version-tag {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--text-dim);
+  vertical-align: middle;
+  margin-left: 0.5rem;
+  letter-spacing: normal;
+  -webkit-text-fill-color: var(--text-dim);
+}
+
+
 
 header p {
   margin: 0.25rem 0 0;

@@ -42,7 +42,9 @@ class MonitorService:
             "led_intensity": 0,
             "last_clip": None,
             "last_updated": None,
+            "version": self._cfg.version,
         }
+
         self._fps_window: Deque[float] = deque(maxlen=30)
         self._latest_jpeg: Optional[bytes] = None
         self._target_labels = set(self._cfg.yolo.target_labels) or {"person"}
