@@ -48,6 +48,7 @@ class MonitorService:
         self._target_labels = set(self._cfg.yolo.target_labels) or {"person"}
         self._last_save_time: float = 0.0
         self._last_prune_time: float = 0.0
+        self._is_recording: bool = False
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -99,14 +100,18 @@ class MonitorService:
 
             # 2. Inference & Annotations
             # Cooldown: skip YOLO inference until the pre-trigger buffer refills
-            cooldown = self._cfg.camera.pre_trigger_time + 5
-            if time.time() - self._last_save_time < cooldown:
+            # We also skip if a recording is currently active
+            cooldown_period = self._cfg.camera.pre_trigger_time + 5
+            in_cooldown = (time.time() - self._last_save_time) < cooldown_period
+            
+            if self._is_recording or in_cooldown:
                 # Still update live stream with raw frame
                 self._latest_jpeg = self._to_jpeg(frame.image)
+                state = "saving" if self._is_recording else "cooldown"
                 self._status_update({
                     "human_present": False,
                     "fps": self._compute_fps(),
-                    "recording_state": "cooldown",
+                    "recording_state": state,
                     "last_updated": frame.timestamp,
                 })
                 continue
@@ -118,8 +123,6 @@ class MonitorService:
             self._latest_jpeg = self._to_jpeg(detection.annotated_frame)
             self._handle_detection(frame.timestamp, detection, frame.image)
 
-
-
     def _handle_detection(self, timestamp: float, detection: DetectionResult, frame: np.ndarray) -> None:
         human_conf = 0.0
         if detection.detections:
@@ -130,7 +133,7 @@ class MonitorService:
 
         fps = self._compute_fps()
 
-        if detection.human_present:
+        if detection.human_present and not self._is_recording:
             min_clip = self._cfg.camera.minimum_clip
             pre_trigger = self._cfg.camera.pre_trigger_time
             LOGGER.info(
@@ -138,6 +141,10 @@ class MonitorService:
                 human_conf, min_clip, pre_trigger, min_clip - pre_trigger,
             )
 
+            # Important: Mark as recording immediately to prevent duplicate threads
+            self._is_recording = True
+            
+            # Update status to indicate recording has started
             self._status_update({
                 "human_present": True,
                 "confidence": round(human_conf, 3),
@@ -169,8 +176,7 @@ class MonitorService:
         """Saves a clip, metadata, and thumbnail in the background."""
         try:
             clip_path = self._camera.save_clip(self._cfg.recording.base_dir)
-            self._last_save_time = time.time()
-
+            
             if clip_path:
                 LOGGER.info("Clip saved: %s", clip_path)
                 
@@ -204,6 +210,10 @@ class MonitorService:
         except Exception:
             LOGGER.error("Background recording failed", exc_info=True)
             self._status_update({"recording_state": "monitoring"})
+        finally:
+            self._last_save_time = time.time()
+            self._is_recording = False
+
 
 
     def _status_update(self, payload: Dict[str, object]) -> None:
