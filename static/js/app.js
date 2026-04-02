@@ -4,6 +4,7 @@ const fpsEl = document.getElementById("fps");
 const recordingStateEl = document.getElementById("recording-state");
 const recordingOverlay = document.getElementById("recording-overlay");
 const temperatureEl = document.getElementById("temperature");
+const cpuTempEl = document.getElementById("cpu-temp");
 const humidityEl = document.getElementById("humidity");
 const ledSlider = document.getElementById("led-slider");
 const ledValueEl = document.getElementById("led-value");
@@ -23,12 +24,13 @@ async function refreshStatus() {
 
     // Detections
     if (payload.human_present) {
-      presenceEl.textContent = "DETECTED";
+      presenceEl.textContent = "HUMAN";
       presenceEl.className = "badge-active value";
     } else {
       presenceEl.textContent = "CLEAR";
       presenceEl.className = "badge-idle value";
     }
+
 
     confidenceEl.textContent = payload.confidence?.toFixed(2) ?? "0.00";
     fpsEl.textContent = payload.fps?.toFixed(1) ?? "0.0";
@@ -46,11 +48,15 @@ async function refreshStatus() {
 
     // Sensors
     if (payload.temperature_f !== undefined) {
-      temperatureEl.textContent = `${payload.temperature_f.toFixed(1)}°F / ${payload.temperature_c.toFixed(1)}°C`;
+      temperatureEl.textContent = `${payload.temperature_f.toFixed(1)}°F`;
+    }
+    if (payload.cpu_temp !== undefined) {
+      cpuTempEl.textContent = `${payload.cpu_temp.toFixed(1)}°C`;
     }
     if (payload.humidity !== undefined) {
       humidityEl.textContent = payload.humidity.toFixed(1) + "%";
     }
+
 
     // Controls
     if (payload.led_intensity !== undefined && !ledSlider._userDragging) {

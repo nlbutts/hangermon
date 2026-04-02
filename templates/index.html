@@ -39,12 +39,19 @@
         </div>
       </section>
 
-      <section id="env-section" class="card grid-2">
+      <section id="env-section" class="card grid-3">
         <div class="env-item">
           <span class="icon">🌡️</span>
           <div>
-            <span class="label">Temperature</span>
+            <span class="label">Ambient</span>
             <div id="temperature" class="value">--</div>
+          </div>
+        </div>
+        <div class="env-item">
+          <span class="icon">🔥</span>
+          <div>
+            <span class="label">CPU Temp</span>
+            <div id="cpu-temp" class="value">--</div>
           </div>
         </div>
         <div class="env-item">
@@ -63,6 +70,7 @@
           <input type="range" id="led-slider" min="0" max="255" value="0" />
         </div>
       </section>
+
 
       <section id="clips-section">
         <div class="section-header">

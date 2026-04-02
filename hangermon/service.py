@@ -38,6 +38,7 @@ class MonitorService:
             "temperature_c": 0.0,
             "temperature_f": 32.0,
             "humidity": 0.0,
+            "cpu_temp": 0.0,
             "led_intensity": 0,
             "last_clip": None,
             "last_updated": None,
@@ -46,12 +47,13 @@ class MonitorService:
         self._latest_jpeg: Optional[bytes] = None
         self._target_labels = set(self._cfg.yolo.target_labels) or {"person"}
         self._last_save_time: float = 0.0
+        self._last_prune_time: float = 0.0
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
             return
         LOGGER.info("Starting monitor service")
-        catalog.prune_old(self._cfg.recording.base_dir, self._cfg.recording.retention_days)
+        self._prune_if_needed(force=True)
         self._camera.start()
         self._stop.clear()
         self._thread = threading.Thread(target=self._run, name="monitor-loop", daemon=True)
@@ -84,31 +86,39 @@ class MonitorService:
             if self._stop.is_set():
                 break
 
-            # JPEG for web streaming (always update, even during cooldown)
-            self._latest_jpeg = self._to_jpeg(frame.image)
-
-            # Sense HAT sensors
+            # 1. Status & Sensors
             sensor_data = sensehat.read_sensors()
-            self._status_update(sensor_data | {"led_intensity": sensehat.get_led_intensity()})
+            self._status_update(sensor_data | {
+                "led_intensity": sensehat.get_led_intensity(),
+                "cpu_temp": self._get_cpu_temp(),
+            })
+            self._prune_if_needed()
 
             # FPS tracking
             self._fps_window.append(time.time())
 
+            # 2. Inference & Annotations
             # Cooldown: skip YOLO inference until the pre-trigger buffer refills
-            cooldown = self._cfg.camera.pre_trigger_time + 5  # extra margin
+            cooldown = self._cfg.camera.pre_trigger_time + 5
             if time.time() - self._last_save_time < cooldown:
-                fps = self._compute_fps()
+                # Still update live stream with raw frame
+                self._latest_jpeg = self._to_jpeg(frame.image)
                 self._status_update({
                     "human_present": False,
-                    "fps": fps,
+                    "fps": self._compute_fps(),
                     "recording_state": "cooldown",
                     "last_updated": frame.timestamp,
                 })
                 continue
 
-            # YOLO inference on every frame
+            # Run YOLO on every frame (user requested removal of motion filter)
             detection = self._detector.detect(frame.image, None, None)
+            
+            # Use annotated frame for the web UI
+            self._latest_jpeg = self._to_jpeg(detection.annotated_frame)
             self._handle_detection(frame.timestamp, detection, frame.image)
+
+
 
     def _handle_detection(self, timestamp: float, detection: DetectionResult, frame: np.ndarray) -> None:
         human_conf = 0.0
@@ -214,6 +224,22 @@ class MonitorService:
     def _to_jpeg(frame: np.ndarray) -> Optional[bytes]:
         success, buf = cv2.imencode(".jpg", frame)
         return buf.tobytes() if success else None
+
+    def _get_cpu_temp(self) -> float:
+        """Read RPi CPU temperature from sysfs."""
+        try:
+            with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
+                return round(int(f.read().strip()) / 1000.0, 1)
+        except Exception:
+            return 0.0
+
+    def _prune_if_needed(self, force: bool = False) -> None:
+        """Periodic background storage cleanup (every hour)."""
+        now = time.time()
+        if force or (now - self._last_prune_time > 3600):
+            self._last_prune_time = now
+            catalog.prune_old(self._cfg.recording.base_dir, self._cfg.recording.retention_days)
+
 
 
 __all__ = ["MonitorService"]
